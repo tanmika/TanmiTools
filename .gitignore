@@ -1,3 +1,8 @@
+# VS
+.vs/*
+sln/.vs/*
+sln/x64/*
+
 # Prerequisites
 *.d
 
