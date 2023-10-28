@@ -14,8 +14,17 @@
 #include <string>
 #include <fstream>
 #include <bitset>
+#include <unordered_set>
 
 using std::vector;
+
+struct PairHash
+{
+	std::size_t operator()(const std::pair<int, int>& p) const
+	{
+		return std::hash<int>()(p.first) ^ (std::hash<int>()(p.second) << 1);
+	}
+};
 /*管理地图工具的单例类*/
 namespace TanmiTool {
 	enum class MapMode
@@ -119,6 +128,19 @@ namespace TanmiTool {
 				return;
 			}
 		}
+		static void Compare(TanmiMap& map0, TanmiMap& map1)
+		{
+			TanmiTool::TanmiMap com_map(std::min(map0.width, map1.width), std::min(map0.height, map1.height), std::min(map0.typeNum,map1.typeNum));
+			for (size_t i = 0; i < com_map.width; i++)
+			{
+				for (size_t j = 0; j < com_map.height; j++)
+				{
+					if (map0.map[i][j] != map1.map[i][j])
+						com_map.map[i][j] = 1;
+				}
+			}
+			com_map.PrintMap();
+		}
 	};
 	
 	class TanmiMapTool
@@ -135,8 +157,8 @@ namespace TanmiTool {
 		}	///< 设置生成模式
 		TanmiMapTool& SetSize(int _width, int _height)
 		{
-			width = std::max(1, _height);
-			height = std::max(1, _width); return *this;
+			width = std::max(1, _width);
+			height = std::max(1, _height); return *this;
 		}	///< 设置地图大小
 		TanmiMapTool& SetRandSeed(unsigned int _seed)
 		{
@@ -166,6 +188,8 @@ namespace TanmiTool {
 		};
 		void CreateRamdonMap(TanmiMap& map, vector<int>& numList, float density);///<生成完全随机的地图
 		void CreateProlifewayMap(TanmiMap& map, float desity, int prolifewayRange, int id);///<生成扩散式地图
+		void RemoveIsolatedLand(TanmiMap& map);///< 移除孤岛
+		void SearchConnectLand(TanmiMap& map, PointInfo& point, int water_id, std::unordered_set<std::pair<int, int>, PairHash>& lands);///< 搜索连通岛屿
 		void bfs(TanmiMap& map, int step, int stepLimit, PointInfo& point, int id);///< 广度优先生成扩散
 		TanmiMapTool() = default;
 		~TanmiMapTool() = default;
@@ -195,11 +219,15 @@ namespace TanmiTool {
 		case TanmiTool::MapMode::prolifeway:
 			for (size_t i = 1; i < typeNum; i++)
 			{
-				CreateProlifewayMap(map, 0.01f, (width + height) / 6, i);
+				CreateProlifewayMap(map, 0.015f, (width + height) / 8, i);
 			}
 			break;
 		default:
 			break;
+		}
+		if (map.setting.mask & 1)
+		{
+			RemoveIsolatedLand(map);
 		}
 		return map;
 	}
@@ -232,6 +260,63 @@ namespace TanmiTool {
 				}
 			}
 		}
+	}
+	inline void TanmiMapTool::RemoveIsolatedLand(TanmiMap& map)
+	{
+		std::unordered_set<std::pair<int, int>, PairHash> lands;
+		int x = 0, y = 0, w = 0;
+		for (auto i = 0; i < map.width; i++)
+		{
+			PointInfo point(i, y, map.map[i][y]);
+			SearchConnectLand(map, point, w, lands);
+		}
+		y = map.height - 1;
+		for (auto i = 0; i < map.width; i++)
+		{
+			PointInfo point(i, y, map.map[i][y]);
+			SearchConnectLand(map, point, w, lands);
+		}
+		for (auto i = 0; i < map.height; i++)
+		{
+			PointInfo point(x, i, map.map[x][i]);
+			SearchConnectLand(map, point, w, lands);
+		}
+		x = map.width - 1;
+		for (auto i = 0; i < map.height; i++)
+		{
+			PointInfo point(x, i, map.map[x][i]);
+			SearchConnectLand(map, point, w, lands);
+		}
+		for (auto i = 0; i < map.width; i++)
+		{
+			for (auto j = 0; j < map.height; j++)
+			{
+				if (lands.count(std::pair(i, j)) == 0)
+				{
+					map.map[i][j] = w;
+				}
+			}
+		}
+	}
+	inline void TanmiMapTool::SearchConnectLand(TanmiMap& map, PointInfo& point, int water_id, std::unordered_set<std::pair<int, int>, PairHash>& lands)
+	{
+		if (point.x < 0 || point.x >= map.width || point.y < 0 || point.y >= map.height)
+			return;
+		if (lands.count(std::pair(point.x, point.y)))
+			return;
+		if (map.map[point.x][point.y] == water_id)
+			return;
+		lands.insert(std::pair(point.x, point.y));
+		point.x += 1;
+		SearchConnectLand(map, point, water_id, lands);
+		point.x -= 2;
+		SearchConnectLand(map, point, water_id, lands);
+		point.x += 1;
+		point.y += 1;
+		SearchConnectLand(map, point, water_id, lands);
+		point.y -= 2;
+		SearchConnectLand(map, point, water_id, lands);
+		point.y += 1;
 	}
 	inline void TanmiMapTool::bfs(TanmiMap& map, int step, int stepLimit, PointInfo& point, int id)
 	{

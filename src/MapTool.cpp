@@ -8,14 +8,25 @@ int main()
 {
 	TanmiMapMaskSetting setting;
 	//setting.PrintMask();
-	setting.RemoveIsolatedLand()
-		.ProlifewayCircle();
+	setting.ProlifewayCircle();
 	//setting.PrintMask();
 	auto map = TanmiMapTool::Instance().SetMaskSetting(setting)
 		.SetMode(MapMode::prolifeway)
-		.SetRandSeed(114510)
+		.SetRandSeed(13)
 		.SetSize(50,40)
 		.CreateMap();
+
+	setting.RemoveIsolatedLand(true);
+	auto map2 = TanmiMapTool::Instance().SetMaskSetting(setting)
+		.SetMode(MapMode::prolifeway)
+		.SetRandSeed(13)
+		.SetSize(50, 40)
+		.CreateMap();
 	map.PrintMap();
+	std::cout << std::endl;
+	map2.PrintMap();	
+	std::cout << std::endl;
+	TanmiMap::Compare(map, map2);
+
 	return 0;
 }
